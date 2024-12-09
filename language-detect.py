@@ -5,7 +5,8 @@ df.rename(columns={'auhtor_ID': 'author_ID'}, inplace=True)
 
 model = pipeline(
     "text-classification",
-    model="papluca/xlm-roberta-base-language-detection"
+    model="papluca/xlm-roberta-base-language-detection",
+    device=0 #gpu
 )
 all_texts = df["post"].values.tolist()
 all_langs = model(all_texts, truncation=True, batch_size=10)
