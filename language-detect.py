@@ -1,20 +1,29 @@
 import pandas as pd
 from transformers import pipeline
+from tqdm import tqdm
+
+# Load dataset
 df = pd.read_csv("./data/political_leaning.csv")
 df.rename(columns={'auhtor_ID': 'author_ID'}, inplace=True)
 
+# Initialize model
 model = pipeline(
     "text-classification",
     model="papluca/xlm-roberta-base-language-detection",
     device=0 #gpu
 )
-all_texts = df["post"].values.tolist()
-all_langs = model(all_texts, truncation=True, batch_size=10)
-df["language"] = [d["label"] for d in all_langs]
 
-# Display the result
+all_texts = df["post"].values.tolist()  # post column to text list
+all_langs = []
+
+# Use tqdm to track progress
+for text in tqdm(all_texts, desc="Detecting languages"):
+    result = model(text, truncation=True)
+    all_langs.append(result[0]["label"])
+
+df["language"] = all_langs  # add result to dataframe
 print(df)
-df.to_csv('./data/out.csv')
+df.to_csv('./data/out.csv', index=False)    # save result
 
 # import torch
 # from transformers import AutoTokenizer, AutoModelForSequenceClassification
