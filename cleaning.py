@@ -3,6 +3,7 @@ import pandas as pd
 from nltk.corpus import words, stopwords
 from difflib import get_close_matches
 import nltk
+from sklearn.preprocessing import LabelEncoder
 
 # Download necessary NLTK corpora (do this only once in your environment)
 nltk.download('words')
@@ -83,4 +84,16 @@ def clean_and_correct_text(text):
 df = pd.read_csv("./data/political_leaning.csv")
 df.rename(columns={'auhtor_ID': 'author_ID'}, inplace=True)
 df["processed_post"] = df["post"].apply(lambda x: clean_and_correct_text(x) if isinstance(x, str) else x)
+
+# Calculate  nr of words and nr of characters for each post
+df['nr_of_words'] = df['clean_post'].apply(lambda x: len(x.split()))
+df['nr_of_characters'] = df['clean_post'].apply(len)
+
+# Label Encoding
+le = LabelEncoder()
+df['label'] = le.fit_transform(df['political_leaning'])  # 0, 1, 2 for center, left, right respectively
+
+# Drop not needed columns
+df.drop(columns=['post', 'political_leaning'], axis=1)
+
 df.to_csv('./data/processed.csv', index=False)
