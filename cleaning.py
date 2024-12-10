@@ -76,7 +76,7 @@ def clean_and_correct_text(text):
     text = clean_reddit_formatting(text)  # First, clean Reddit-specific formatting
     tokens = word_pattern.findall(text)  # Tokenize the cleaned text
     corrected_tokens = [correct_english_word(word) for word in tokens]
-    filtered_tokens = [word for word in corrected_tokens if word and word not in stop_words]
+    filtered_tokens = [word.lower() for word in corrected_tokens if word and word not in stop_words]
     return ' '.join(filtered_tokens)
 
 
