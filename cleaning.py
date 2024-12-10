@@ -1,13 +1,16 @@
 import re
+from multiprocessing import Pool, cpu_count
+
+import numpy as np
 import pandas as pd
 from nltk.corpus import words, stopwords
 from difflib import get_close_matches
-import nltk
 from sklearn.preprocessing import LabelEncoder
+from tqdm import tqdm
 
 # Download necessary NLTK corpora (do this only once in your environment)
-nltk.download('words')
-nltk.download('stopwords')
+# nltk.download('words')
+# nltk.download('stopwords')
 
 # Load English words and stopwords into sets for fast lookups
 english_words = set(words.words())
@@ -52,6 +55,8 @@ def clean_reddit_formatting(text):
     """
     Removes Reddit-specific formatting and normalizes the text.
     """
+
+
     text = bot_command_pattern.sub('', text)
     text = footnote_pattern.sub('', text)
     text = markdown_link_pattern.sub(r'\1', text)
@@ -76,24 +81,58 @@ def clean_and_correct_text(text):
     """
     text = clean_reddit_formatting(text)  # First, clean Reddit-specific formatting
     tokens = word_pattern.findall(text)  # Tokenize the cleaned text
-    corrected_tokens = [correct_english_word(word) for word in tokens]
-    filtered_tokens = [word.lower() for word in corrected_tokens if word and word not in stop_words]
+    # corrected_tokens = [correct_english_word(word) for word in tokens]
+    filtered_tokens = [word.lower() for word in tokens if word and word not in stop_words]
     return ' '.join(filtered_tokens)
 
 
-df = pd.read_csv("./data/political_leaning.csv")
-df.rename(columns={'auhtor_ID': 'author_ID'}, inplace=True)
-df["processed_post"] = df["post"].apply(lambda x: clean_and_correct_text(x) if isinstance(x, str) else x)
+def parallelize_dataframe(df, func, num_partitions=None):
+    """
+    Splits a DataFrame into partitions and applies a function in parallel.
 
-# Calculate  nr of words and nr of characters for each post
-df['nr_of_words'] = df['clean_post'].apply(lambda x: len(x.split()))
-df['nr_of_characters'] = df['clean_post'].apply(len)
+    Args:
+        df (DataFrame): The DataFrame to process.
+        func (function): The function to apply to each partition.
+        num_partitions (int): Number of partitions (defaults to CPU count).
 
-# Label Encoding
-le = LabelEncoder()
-df['label'] = le.fit_transform(df['political_leaning'])  # 0, 1, 2 for center, left, right respectively
+    Returns:
+        DataFrame: The processed DataFrame.
+    """
+    num_partitions = num_partitions or cpu_count()
+    df_split = np.array_split(df, num_partitions)
+    with Pool(num_partitions) as pool:
+        with tqdm(total=num_partitions, desc="Processing Partitions") as pbar:
+            results = []
+            for result in pool.imap_unordered(func, df_split):
+                results.append(result)
+                pbar.update(1)
+        df = pd.concat(pool.map(func, df_split))
+    return df
 
-# Drop not needed columns
-df.drop(columns=['post', 'political_leaning'], axis=1)
+def process_partition(df_partition):
+    """
+    Processes a partition of the DataFrame.
+    """
+    df_partition["processed_post"] = df_partition["post"].apply(
+        lambda x: clean_and_correct_text(x) if isinstance(x, str) else x
+    )
+    return df_partition
 
-df.to_csv('./data/processed.csv', index=False)
+
+if __name__ == '__main__':
+    df = pd.read_csv("./data/political_leaning.csv")
+    df.rename(columns={'auhtor_ID': 'author_ID'}, inplace=True)
+    df = df.head(8)
+    # Apply parallel processing
+    df = parallelize_dataframe(df, process_partition)
+
+    # Continue with the rest of the pipeline
+    df['nr_of_words'] = df['processed_post'].apply(lambda x: len(x.split()))
+    df['nr_of_characters'] = df['processed_post'].apply(len)
+
+    # Label Encoding
+    le = LabelEncoder()
+    df['label'] = le.fit_transform(df['political_leaning'])
+
+    df = df.drop(columns=['post', 'political_leaning'], axis=1)
+    df.to_csv('./data/processed.csv', index=False)
