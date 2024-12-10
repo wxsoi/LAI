@@ -1,9 +1,11 @@
 import re
 from nltk.corpus import words
+from nltk.corpus import stopwords
 from difflib import get_close_matches
 import nltk
 
 nltk.download('words')  # Download the English word corpus
+nltk.download('stopwords') # Download  stopwords
 
 # Load English words into a set for quick lookup
 english_words = set(words.words())
@@ -80,21 +82,26 @@ def is_english_with_typos(word, threshold=0.8):
     return len(close_matches) > 0
 
 
-def clean_non_english_words(text):
+def clean_non_english_and_stopwords(text):
     """
-    Removes non-English words from the text, allowing for typos.
-
+    Cleans the input text by removing non-English words (considering typos) 
+    and removing stopwords in one pass.
+    
     Args:
         text (str): The input text.
-
+    
     Returns:
-        str: The cleaned text with non-English words removed.
+        str: The cleaned text with non-English words and stopwords removed.
     """
-    # Split text into words using regex to capture punctuation as separate tokens
-    tokens = re.findall(r'\b\w+\b', text)
+    # Compile the stopwords set
+    stop_words = set(stopwords.words('english'))
 
-    # Filter words, keeping only English words or valid typos
-    cleaned_tokens = [word for word in tokens if is_english_with_typos(word)]
-
-    # Reconstruct the cleaned text
-    return ' '.join(cleaned_tokens)
+    # Split text into words and process
+    tokens = re.findall(r'\b\w+\b', text)  # Splits into words based on word boundaries
+    filtered_tokens = [
+        word for word in tokens 
+        if is_english_with_typos(word) and word.lower() not in stop_words #remove stopwords, non-english, typos
+    ]
+    
+    # Reconstruct and return the cleaned text
+    return ' '.join(filtered_tokens)
