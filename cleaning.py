@@ -94,6 +94,6 @@ le = LabelEncoder()
 df['label'] = le.fit_transform(df['political_leaning'])  # 0, 1, 2 for center, left, right respectively
 
 # Drop not needed columns
-df.drop(columns=['post', 'political_leaning'], axis=1)
+df = df.drop(columns=['post', 'political_leaning'], axis=1)
 
 df.to_csv('./data/processed.csv', index=False)
