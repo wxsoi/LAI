@@ -10,23 +10,7 @@ from rapidfuzz import fuzz, process
 # Load English words and stopwords into sets for fast lookups
 english_words = set(words.words())
 stop_words = set(stopwords.words('english'))
-
-# Precompile regex patterns
 word_pattern = re.compile(r'\b\w+\b')  # Matches words
-bot_command_pattern = re.compile(r'!\w+(\s+\d+\s+\w+)?')
-footnote_pattern = re.compile(r'\^\^\S+|\^\^\[.*?\]')
-markdown_link_pattern = re.compile(r'\[([^\]]+)\]\((https?:\/\/[^\)]+)\)')
-subreddit_pattern = re.compile(r'\/?r\/[A-Za-z0-9_]+')
-user_pattern = re.compile(r'\/?u\/[A-Za-z0-9_-]+')
-inline_code_pattern = re.compile(r'`{1,3}.*?`{1,3}', flags=re.DOTALL)
-block_quote_pattern = re.compile(r'^>.*$', flags=re.MULTILINE)
-markdown_format_pattern = re.compile(r'(\*{1,3})(.*?)\1')
-strikethrough_pattern = re.compile(r'~~(.*?)~~')
-spoiler_pattern = re.compile(r'>!.*?!<')
-raw_link_pattern = re.compile(r'https?:\/\/\S+')
-list_item_pattern = re.compile(r'^\s*[-\*]\s+', flags=re.MULTILINE)
-numbered_list_pattern = re.compile(r'^\s*\d+\.\s+', flags=re.MULTILINE)
-
 
 def is_english_word(word):
     """
@@ -50,26 +34,36 @@ def is_english_word(word):
     return ""
 
 
-def clean_reddit_formatting(text):
-    """
-    Removes Reddit-specific formatting and normalizes the text.
-    """
+def remove_reddit_formatting(text):
+    # Define a series of regex patterns and replacements to remove formatting
+    patterns = [
+        (r'\*\*([^*]+)\*\*', r'\1'),  # Bold
+        (r'__([^_]+)__', r'\1'),          # Bold
+        (r'\*([^*]+)\*', r'\1'),        # Italic
+        (r'_([^_]+)_', r'\1'),            # Italic
+        (r'\*\*\*([^*]+)\*\*\*', r'\1'),  # Bold-italic
+        (r'___([^_]+)___', r'\1'),        # Bold-italic
+        (r'~~([^~]+)~~', r'\1'),          # Strikethrough
+        (r'>!([^!]+)!<', r'\1'),          # Spoilers
+        (r'\^\(([^)]+)\)', r'\1'),     # Superscript (parentheses style)
+        (r'\^([^ ]+)', r'\1'),           # Superscript (standalone)
+        (r'`([^`]+)`', r'\1'),            # Code
+        (r'r/([^ ]+)', r''),            # r/subreddit
+        (r'u/([^ ]+)', r''),            # u/user
+        (r'\[([^\]]+)\]\([^\)]+\)', r'\1'),  # Markdown links
+        (r'\[([^\]]+)\]\[[^\]]+\]', r'\1'),  # Reference links
+        (r'\[(\d+)\]: [^\s]+', r''),   # Reference link definitions
+        (r'^(#+)\s*(.+)', r'\2'),        # Headings
+        (r'^\s*[-*]\s+', r''),           # Unordered list items
+        (r'\d+\.\s+', r''),             # Ordered list items
+        (r'<([^_]+)>', r''),  # web link <>
+        (r'> ([^ ]+)', r'\1'),  # > quotes
+        (r'[^\x00-\x7F]+', r''), # nonstandard symbols
+        (r'&gt', r''),  # remove &gt idk what this is but its all over
+    ]
 
-
-    text = bot_command_pattern.sub('', text)
-    text = footnote_pattern.sub('', text)
-    text = markdown_link_pattern.sub(r'\1', text)
-    text = subreddit_pattern.sub('', text)
-    text = user_pattern.sub('', text)
-    text = inline_code_pattern.sub('', text)
-    text = block_quote_pattern.sub('', text)
-    text = markdown_format_pattern.sub(r'\2', text)
-    text = strikethrough_pattern.sub(r'\1', text)
-    text = spoiler_pattern.sub('', text)
-    text = raw_link_pattern.sub('', text)
-    text = list_item_pattern.sub('', text)
-    text = numbered_list_pattern.sub('', text)
-    text = re.sub(r'\n+', '\n', text).strip()  # Remove extra newlines and trim
+    for pattern, replacement in patterns:
+        text = re.sub(pattern, replacement, text, flags=re.MULTILINE)
     return text
 
 
@@ -78,7 +72,7 @@ def clean_and_correct_text(text):
     Cleans and corrects text by removing Reddit formatting, non-English words, typos,
     and stopwords.
     """
-    text = clean_reddit_formatting(text)  # First, clean Reddit-specific formatting
+    text = remove_reddit_formatting(text)  # First, clean Reddit-specific formatting
     tokens = word_pattern.findall(text)  # Tokenize the cleaned text
     corrected_tokens = [is_english_word(word) for word in tokens if word]  # Correct words
     filtered_tokens = [word for word in corrected_tokens if word not in stop_words]
