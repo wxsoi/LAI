@@ -60,6 +60,7 @@ def remove_reddit_formatting(text):
         (r'> ([^ ]+)', r'\1'),  # > quotes
         (r'[^\x00-\x7F]+', r''), # nonstandard symbols
         (r'&gt', r''),  # remove &gt idk what this is but its all over
+        (r'&lt', r''),  # &lt idk
     ]
 
     for pattern, replacement in patterns:
