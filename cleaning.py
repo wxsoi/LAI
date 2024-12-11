@@ -1,16 +1,11 @@
 import re
 from multiprocessing import Pool, cpu_count
-
 import numpy as np
 import pandas as pd
 from nltk.corpus import words, stopwords
-from difflib import get_close_matches
 from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
-
-# Download necessary NLTK corpora (do this only once in your environment)
-# nltk.download('words')
-# nltk.download('stopwords')
+from rapidfuzz import fuzz, process
 
 # Load English words and stopwords into sets for fast lookups
 english_words = set(words.words())
@@ -33,22 +28,26 @@ list_item_pattern = re.compile(r'^\s*[-\*]\s+', flags=re.MULTILINE)
 numbered_list_pattern = re.compile(r'^\s*\d+\.\s+', flags=re.MULTILINE)
 
 
-def correct_english_word(word, threshold=0.8):
+def is_english_word(word):
     """
-    Corrects a word if it is a typo or invalid English word.
+    Determines if a word is in English or a close typo. Retains if so, removes otherwise.
 
     Args:
-        word (str): The word to correct.
-        threshold (float): Similarity threshold for corrections.
+        word (str): The word to check.
+        typo_threshold (int): Minimum similarity (0-100) to retain a typo.
 
     Returns:
-        str: Corrected word if valid, else an empty string.
+        bool: True if the word is English or close to English; False otherwise.
     """
-    word = word.lower()
-    if word in english_words:  # Exact match
-        return word
-    close_matches = get_close_matches(word, english_words, n=1, cutoff=threshold)
-    return close_matches[0] if close_matches else ""  # Return closest match or empty
+    if word in english_words:
+        return word  # Word is valid English
+
+    # Check for close matches using rapidfuzz
+    best_match = process.extractOne(word, english_words, scorer=fuzz.ratio)
+    if best_match[1] >= 85:
+        return best_match[0]
+
+    return ""
 
 
 def clean_reddit_formatting(text):
@@ -81,8 +80,8 @@ def clean_and_correct_text(text):
     """
     text = clean_reddit_formatting(text)  # First, clean Reddit-specific formatting
     tokens = word_pattern.findall(text)  # Tokenize the cleaned text
-    # corrected_tokens = [correct_english_word(word) for word in tokens]
-    filtered_tokens = [word.lower() for word in tokens if word and word not in stop_words]
+    corrected_tokens = [is_english_word(word) for word in tokens if word]  # Correct words
+    filtered_tokens = [word for word in corrected_tokens if word not in stop_words]
     return ' '.join(filtered_tokens)
 
 
@@ -122,7 +121,8 @@ def process_partition(df_partition):
 if __name__ == '__main__':
     df = pd.read_csv("./data/political_leaning.csv")
     df.rename(columns={'auhtor_ID': 'author_ID'}, inplace=True)
-    df = df.head(8)
+    df = df[df["author_ID"] == 't2_431z3f5']
+    #df = df.head(100)
     # Apply parallel processing
     df = parallelize_dataframe(df, process_partition)
 
@@ -133,6 +133,6 @@ if __name__ == '__main__':
     # Label Encoding
     le = LabelEncoder()
     df['label'] = le.fit_transform(df['political_leaning'])
-
-    df = df.drop(columns=['post', 'political_leaning'], axis=1)
+    df = df.drop(columns=['political_leaning'], axis=1)
+    #df = df.drop(columns=['post', 'political_leaning'], axis=1)
     df.to_csv('./data/processed.csv', index=False)
