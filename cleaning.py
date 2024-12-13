@@ -7,28 +7,24 @@ from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
 from gensim.parsing.preprocessing import remove_stopwords
 import contractions
+from textblob import Word
 
-
-def is_english_word(word):
+def is_english_word(tokens):
     """
     Determines if a word is in English or a close typo. Retains if so, removes otherwise.
 
     Args:
-        word (str): The word to check.
-        typo_threshold (int): Minimum similarity (0-100) to retain a typo.
+        tokens (list): The list of tokens to check
 
     Returns:
-        bool: True if the word is English or close to English; False otherwise.
+        correct_tokens (list): The list of tokens with >=85% probability being English
     """
-    # if word in english_words:
-    #     return word  # Word is valid English
-
-    # # Check for close matches using rapidfuzz
-    # best_match = process.extractOne(word, english_words, scorer=fuzz.ratio)
-    # if best_match[1] >= 85:
-    #     return best_match[0]
-
-    return word
+    correct_tokens = []
+    for token in tokens:
+        suggestion = Word(token).spellcheck()[0]
+        if suggestion[1] >= 0.85: # 85% threshold
+            correct_tokens.append(suggestion[0])
+    return correct_tokens
 
 
 def remove_reddit_formatting(text):
@@ -76,8 +72,8 @@ def clean_and_correct_text(text):
     expanded_text = contractions.fix(text)
     filtered_text = remove_stopwords(expanded_text) # Use gensim's remove_stopwords
     tokens = nltk.word_tokenize(filtered_text)
-    corrected_tokens = [is_english_word(word) for word in tokens if word]  # Correct words
-    final = ' '.join(corrected_tokens) # Join tokens back into a string
+    correct_tokens = is_english_word(tokens)
+    final = ' '.join(correct_tokens) # Join tokens back into a string
     return final
 
 def parallelize_dataframe(df, func, num_partitions=None):
@@ -130,4 +126,4 @@ if __name__ == '__main__':
     df['label'] = le.fit_transform(df['political_leaning'])
     df = df.drop(columns=['political_leaning'], axis=1)
     #df = df.drop(columns=['post', 'political_leaning'], axis=1)
-    df.to_csv('./data/try.csv', index=False)
+    df.to_csv('./data/test.csv', index=False)
