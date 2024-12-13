@@ -2,15 +2,12 @@ import re
 from multiprocessing import Pool, cpu_count
 import numpy as np
 import pandas as pd
-from nltk.corpus import words, stopwords
+import nltk
 from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
-from rapidfuzz import fuzz, process
+from gensim.parsing.preprocessing import remove_stopwords
+import contractions
 
-# Load English words and stopwords into sets for fast lookups
-english_words = set(words.words())
-stop_words = set(stopwords.words('english'))
-word_pattern = re.compile(r'\b\w+\b')  # Matches words
 
 def is_english_word(word):
     """
@@ -23,15 +20,15 @@ def is_english_word(word):
     Returns:
         bool: True if the word is English or close to English; False otherwise.
     """
-    if word in english_words:
-        return word  # Word is valid English
+    # if word in english_words:
+    #     return word  # Word is valid English
 
-    # Check for close matches using rapidfuzz
-    best_match = process.extractOne(word, english_words, scorer=fuzz.ratio)
-    if best_match[1] >= 85:
-        return best_match[0]
+    # # Check for close matches using rapidfuzz
+    # best_match = process.extractOne(word, english_words, scorer=fuzz.ratio)
+    # if best_match[1] >= 85:
+    #     return best_match[0]
 
-    return ""
+    return word
 
 
 def remove_reddit_formatting(text):
@@ -74,10 +71,13 @@ def clean_and_correct_text(text):
     and stopwords.
     """
     text = remove_reddit_formatting(text)  # First, clean Reddit-specific formatting
-    tokens = word_pattern.findall(text)  # Tokenize the cleaned text
+    expanded_text = contractions.fix(text)
+    tokens = nltk.word_tokenize(expanded_text)
     corrected_tokens = [is_english_word(word) for word in tokens if word]  # Correct words
-    filtered_tokens = [word for word in corrected_tokens if word not in stop_words]
-    return ' '.join(filtered_tokens)
+    joined_text = ' '.join(corrected_tokens)  # Join tokens back into a string
+    filtered_text = remove_stopwords(joined_text)  # Use gensim's remove_stopwords
+    #filtered_tokens = [word for word in corrected_tokens if word not in stop_words]
+    return filtered_text
 
 
 def parallelize_dataframe(df, func, num_partitions=None):
@@ -130,4 +130,4 @@ if __name__ == '__main__':
     df['label'] = le.fit_transform(df['political_leaning'])
     df = df.drop(columns=['political_leaning'], axis=1)
     #df = df.drop(columns=['post', 'political_leaning'], axis=1)
-    df.to_csv('./data/processed.csv', index=False)
+    df.to_csv('./data/test.csv', index=False)
