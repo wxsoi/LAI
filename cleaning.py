@@ -58,6 +58,7 @@ def remove_reddit_formatting(text):
         (r'[^\x00-\x7F]+', r''), # nonstandard symbols
         (r'&gt', r''),  # remove &gt idk what this is but its all over
         (r'&lt', r''),  # &lt idk
+        (r'(.)\1+', r'\1\1'),  # removing >2 consecutive letters in a word (english usually has only 2)
     ]
 
     for pattern, replacement in patterns:
