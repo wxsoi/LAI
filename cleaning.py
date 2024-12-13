@@ -71,14 +71,13 @@ def clean_and_correct_text(text):
     and stopwords.
     """
     text = remove_reddit_formatting(text)  # First, clean Reddit-specific formatting
+    text = text.lower()
     expanded_text = contractions.fix(text)
-    tokens = nltk.word_tokenize(expanded_text)
+    filtered_text = remove_stopwords(expanded_text) # Use gensim's remove_stopwords
+    tokens = nltk.word_tokenize(filtered_text)
     corrected_tokens = [is_english_word(word) for word in tokens if word]  # Correct words
-    joined_text = ' '.join(corrected_tokens)  # Join tokens back into a string
-    filtered_text = remove_stopwords(joined_text)  # Use gensim's remove_stopwords
-    #filtered_tokens = [word for word in corrected_tokens if word not in stop_words]
-    return filtered_text
-
+    final = ' '.join(corrected_tokens) # Join tokens back into a string
+    return final
 
 def parallelize_dataframe(df, func, num_partitions=None):
     """
@@ -130,4 +129,4 @@ if __name__ == '__main__':
     df['label'] = le.fit_transform(df['political_leaning'])
     df = df.drop(columns=['political_leaning'], axis=1)
     #df = df.drop(columns=['post', 'political_leaning'], axis=1)
-    df.to_csv('./data/test.csv', index=False)
+    df.to_csv('./data/try.csv', index=False)
