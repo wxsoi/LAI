@@ -8,6 +8,10 @@ from tqdm import tqdm
 from gensim.parsing.preprocessing import remove_stopwords
 import contractions
 from textblob import Word
+import stanza
+
+# Initialize the Stanza pipeline
+nlp = stanza.Pipeline(lang='en', processors='tokenize,mwt,pos,lemma')
 
 def is_english_word(tokens):
     """
@@ -67,14 +71,16 @@ def clean_and_correct_text(text):
     Cleans and corrects text by removing Reddit formatting, non-English words, typos,
     and stopwords.
     """
-    text = remove_reddit_formatting(text)  # First, clean Reddit-specific formatting
+    text = remove_reddit_formatting(text)  #     First, clean Reddit-specific formatting
     text = text.lower()
-    expanded_text = contractions.fix(text)
+    expanded_text = contractions.fix(text) # expand contractions
     filtered_text = remove_stopwords(expanded_text) # Use gensim's remove_stopwords
-    tokens = nltk.word_tokenize(filtered_text)
-    correct_tokens = is_english_word(tokens)
-    final = ' '.join(correct_tokens) # Join tokens back into a string
-    return final
+    tokens = nltk.word_tokenize(filtered_text) # tokenize
+    correct_tokens = is_english_word(tokens) # check if its english and autocorrect
+    corrected_words = ' '.join(correct_tokens) # Join tokens back into a string
+    doc = nlp(corrected_words) # lemmatization
+    lemmatized = ' '.join([word.lemma for sentence in doc.sentences for word in sentence.words])
+    return lemmatized
 
 def parallelize_dataframe(df, func, num_partitions=None):
     """
@@ -112,8 +118,7 @@ def process_partition(df_partition):
 if __name__ == '__main__':
     df = pd.read_csv("./data/political_leaning.csv")
     df.rename(columns={'auhtor_ID': 'author_ID'}, inplace=True)
-    df = df[df["author_ID"] == 't2_431z3f5']
-    #df = df.head(100)
+    df = df.head(100)
     # Apply parallel processing
     df = parallelize_dataframe(df, process_partition)
 
@@ -126,4 +131,4 @@ if __name__ == '__main__':
     df['label'] = le.fit_transform(df['political_leaning'])
     df = df.drop(columns=['political_leaning'], axis=1)
     #df = df.drop(columns=['post', 'political_leaning'], axis=1)
-    df.to_csv('./data/test.csv', index=False)
+    df.to_csv('./data/first100.csv', index=False)
