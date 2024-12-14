@@ -1,4 +1,5 @@
 import re
+import time
 from multiprocessing import Pool, cpu_count
 import numpy as np
 import pandas as pd
@@ -116,6 +117,7 @@ def process_partition(df_partition):
 
 
 if __name__ == '__main__':
+    start_time = time.time()  # Start timer
     df = pd.read_csv("./data/political_leaning.csv")
     df.rename(columns={'auhtor_ID': 'author_ID'}, inplace=True)
     df = df.head(100)
@@ -132,3 +134,7 @@ if __name__ == '__main__':
     df = df.drop(columns=['political_leaning'], axis=1)
     #df = df.drop(columns=['post', 'political_leaning'], axis=1)
     df.to_csv('./data/first100.csv', index=False)
+
+    end_time = time.time()  # End timer
+    elapsed_time = end_time - start_time
+    print(f"Total execution time: {elapsed_time:.2f} seconds")
