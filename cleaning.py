@@ -57,9 +57,13 @@ def remove_reddit_formatting(text):
         (r'<([^_]+)>', r''),  # web link <>
         (r'> ([^ ]+)', r'\1'),  # > quotes
         (r'[^\x00-\x7F]+', r''), # nonstandard symbols
-        (r'&gt', r''),  # remove &gt idk what this is but its all over
-        (r'&lt', r''),  # &lt idk
+        (r'&gt', r''),  # remove &gt
+        (r'&lt', r''),  # &lt
+        (r'&nbsp', r''),  # &nbsp
+        (r'&amp', r''),  # &amp
         (r'(.)\1+', r'\1\1'),  # removing >2 consecutive letters in a word (english usually has only 2)
+        (r'\b(?!(?<!\w)(\d{2}|\d{4})(?!\w))\d+\b', r''),  #removing non 2 or 4 digit numbers but keep numbers connected
+                                                            # to words such as ww2
     ]
 
     for pattern, replacement in patterns:
@@ -76,9 +80,10 @@ def clean_and_correct_text(text):
     text = text.lower()
     expanded_text = contractions.fix(text) # expand contractions
     filtered_text = remove_stopwords(expanded_text) # Use gensim's remove_stopwords
-    tokens = nltk.word_tokenize(filtered_text) # tokenize
-    correct_tokens = is_english_word(tokens) # check if its english and autocorrect
-    corrected_words = ' '.join(correct_tokens) # Join tokens back into a string
+    nosymbol_text = re.sub(r'[^\w\s]+', '', filtered_text) # remove symbols
+    tokens = nltk.word_tokenize(nosymbol_text) # tokenize
+    # correct_tokens = is_english_word(tokens) # check if its english and autocorrect
+    corrected_words = ' '.join(tokens) # Join tokens back into a string
     doc = nlp(corrected_words) # lemmatization
     lemmatized = ' '.join([word.lemma for sentence in doc.sentences for word in sentence.words])
     return lemmatized
@@ -120,7 +125,7 @@ if __name__ == '__main__':
     start_time = time.time()  # Start timer
     df = pd.read_csv("./data/political_leaning.csv")
     df.rename(columns={'auhtor_ID': 'author_ID'}, inplace=True)
-    df = df.head(100)
+    df = df.head(10)
     # Apply parallel processing
     df = parallelize_dataframe(df, process_partition)
 
