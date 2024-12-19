@@ -14,6 +14,40 @@ import stanza
 # Initialize the Stanza pipeline
 nlp = stanza.Pipeline(lang='en', processors='tokenize,mwt,pos,lemma')
 
+# Define a series of regex patterns and replacements to remove formatting
+patterns = [
+    (re.compile(r'\*\*([^*]+)\*\*'), r'\1'),  # Bold
+    (re.compile(r'__([^_]+)__'), r'\1'),  # Bold
+    (re.compile(r'\*([^*]+)\*'), r'\1'),  # Italic
+    (re.compile(r'_([^_]+)_'), r'\1'),  # Italic
+    (re.compile(r'\*\*\*([^*]+)\*\*\*'), r'\1'),  # Bold-italic
+    (re.compile(r'___([^_]+)___'), r'\1'),  # Bold-italic
+    (re.compile(r'~~([^~]+)~~'), r'\1'),  # Strikethrough
+    (re.compile(r'>!([^!]+)!<'), r'\1'),  # Spoilers
+    (re.compile(r'\^\(([^)]+)\)'), r'\1'),  # Superscript (parentheses style)
+    (re.compile(r'\^([^ ]+)'), r'\1'),  # Superscript (standalone)
+    (re.compile(r'`([^`]+)`'), r'\1'),  # Code
+    (re.compile(r'r/([^ ]+)'), r''),  # r/subreddit
+    (re.compile(r'u/([^ ]+)'), r''),  # u/user
+    (re.compile(r'\[([^\]]+)\]\([^\)]+\)'), r'\1'),  # Markdown links
+    (re.compile(r'\[([^\]]+)\]\[[^\]]+\]'), r'\1'),  # Reference links
+    (re.compile(r'\[(\d+)\]: [^\s]+'), r''),  # Reference link definitions
+    (re.compile(r'^(#+)\s*(.+)'), r'\2'),  # Headings
+    (re.compile(r'^\s*[-*]\s+'), r''),  # Unordered list items
+    (re.compile(r'\d+\.\s+'), r''),  # Ordered list items
+    (re.compile(r'<([^_]+)>'), r''),  # web link <>
+    (re.compile(r'> ([^ ]+)'), r'\1'),  # > quotes
+    (re.compile(r'[^\x00-\x7F]+'), r''),  # nonstandard symbols
+    (re.compile(r'&gt'), r''),  # remove &gt
+    (re.compile(r'&lt'), r''),  # &lt
+    (re.compile(r'&nbsp'), r''),  # &nbsp
+    (re.compile(r'&amp'), r''),  # &amp
+    (re.compile(r'(.)\1+'), r'\1\1'),  # removing >2 consecutive letters in a word (english usually has only 2)
+    (re.compile(r'\b(?!(?<!\w)(\d{2}|\d{4})(?!\w))\d+\b'), r''),  # removing non 2 or 4 digit numbers but keep numbers connected
+    # to words such as ww2
+]
+
+
 def is_english_word(tokens):
     """
     Determines if a word is in English or a close typo. Retains if so, removes otherwise.
@@ -33,37 +67,8 @@ def is_english_word(tokens):
 
 
 def remove_reddit_formatting(text):
-    # Define a series of regex patterns and replacements to remove formatting
-    patterns = [
-        (r'\*\*([^*]+)\*\*', r'\1'),  # Bold
-        (r'__([^_]+)__', r'\1'),          # Bold
-        (r'\*([^*]+)\*', r'\1'),        # Italic
-        (r'_([^_]+)_', r'\1'),            # Italic
-        (r'\*\*\*([^*]+)\*\*\*', r'\1'),  # Bold-italic
-        (r'___([^_]+)___', r'\1'),        # Bold-italic
-        (r'~~([^~]+)~~', r'\1'),          # Strikethrough
-        (r'>!([^!]+)!<', r'\1'),          # Spoilers
-        (r'\^\(([^)]+)\)', r'\1'),     # Superscript (parentheses style)
-        (r'\^([^ ]+)', r'\1'),           # Superscript (standalone)
-        (r'`([^`]+)`', r'\1'),            # Code
-        (r'r/([^ ]+)', r''),            # r/subreddit
-        (r'u/([^ ]+)', r''),            # u/user
-        (r'\[([^\]]+)\]\([^\)]+\)', r'\1'),  # Markdown links
-        (r'\[([^\]]+)\]\[[^\]]+\]', r'\1'),  # Reference links
-        (r'\[(\d+)\]: [^\s]+', r''),   # Reference link definitions
-        (r'^(#+)\s*(.+)', r'\2'),        # Headings
-        (r'^\s*[-*]\s+', r''),           # Unordered list items
-        (r'\d+\.\s+', r''),             # Ordered list items
-        (r'<([^_]+)>', r''),  # web link <>
-        (r'> ([^ ]+)', r'\1'),  # > quotes
-        (r'[^\x00-\x7F]+', r''), # nonstandard symbols
-        (r'&gt', r''),  # remove &gt idk what this is but its all over
-        (r'&lt', r''),  # &lt idk
-        (r'(.)\1+', r'\1\1'),  # removing >2 consecutive letters in a word (english usually has only 2)
-    ]
-
     for pattern, replacement in patterns:
-        text = re.sub(pattern, replacement, text, flags=re.MULTILINE)
+        text = pattern.sub(replacement, text)
     return text
 
 
@@ -72,16 +77,17 @@ def clean_and_correct_text(text):
     Cleans and corrects text by removing Reddit formatting, non-English words, typos,
     and stopwords.
     """
-    text = remove_reddit_formatting(text)  #     First, clean Reddit-specific formatting
+    text = remove_reddit_formatting(text)  # First, clean Reddit-specific formatting
     text = text.lower()
-    expanded_text = contractions.fix(text) # expand contractions
-    filtered_text = remove_stopwords(expanded_text) # Use gensim's remove_stopwords
-    tokens = nltk.word_tokenize(filtered_text) # tokenize
-    correct_tokens = is_english_word(tokens) # check if its english and autocorrect
-    corrected_words = ' '.join(correct_tokens) # Join tokens back into a string
-    doc = nlp(corrected_words) # lemmatization
-    lemmatized = ' '.join([word.lemma for sentence in doc.sentences for word in sentence.words])
-    return lemmatized
+    text = contractions.fix(text) # expand contractions
+    text = remove_stopwords(text) # Use gensim's remove_stopwords
+    text = re.sub(r'[^\w\s]+', '', text) # remove symbols
+    # tokens = nltk.word_tokenize(text) # tokenize
+    # correct_tokens = is_english_word(tokens) # check if its english and autocorrect
+    # corrected_words = ' '.join(tokens) # Join tokens back into a string
+    doc = nlp(text) # lemmatization
+    text = ' '.join([word.lemma for sentence in doc.sentences for word in sentence.words])
+    return text
 
 def parallelize_dataframe(df, func, num_partitions=None):
     """
@@ -121,6 +127,7 @@ if __name__ == '__main__':
     df = pd.read_csv("./data/political_leaning.csv")
     df.rename(columns={'auhtor_ID': 'author_ID'}, inplace=True)
     df = df.head(100)
+
     # Apply parallel processing
     df = parallelize_dataframe(df, process_partition)
 
@@ -133,8 +140,8 @@ if __name__ == '__main__':
     df['label'] = le.fit_transform(df['political_leaning'])
     df = df.drop(columns=['political_leaning'], axis=1)
     #df = df.drop(columns=['post', 'political_leaning'], axis=1)
-    df.to_csv('./data/first100.csv', index=False)
+
+    df.to_csv('./data/first100test.csv', index=False)
 
     end_time = time.time()  # End timer
-    elapsed_time = end_time - start_time
-    print(f"Total execution time: {elapsed_time:.2f} seconds")
+    print(f"Total execution time: {end_time - start_time:.2f} seconds")
