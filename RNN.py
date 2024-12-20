@@ -3,6 +3,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torchtext
 from sklearn.model_selection import train_test_split
 from torchtext.data import get_tokenizer
 from torchtext.vocab import build_vocab_from_iterator
@@ -37,6 +38,8 @@ def text_pipeline(text):
 
 
 if __name__ == '__main__':
+    torchtext.disable_torchtext_deprecation_warning()
+
     # Hyperparameters
     embedding_dim = 50
     hidden_size = 128
@@ -45,6 +48,10 @@ if __name__ == '__main__':
     num_epochs = 10
 
     df = pd.read_csv('./data/clean.csv')
+    df = df.head(100)
+
+    print(f"Is CUDA supported by this system? {torch.cuda.is_available()}")
+    print(f"CUDA version: {torch.version.cuda}")
 
     tokenizer = get_tokenizer("basic_english")
 
@@ -60,6 +67,10 @@ if __name__ == '__main__':
     criterion = nn.NLLLoss()
     optimizer = optim.SGD(model.parameters(), lr=learning_rate)
 
+    # Move it to GPU
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f'Using device: {device}')
+
     # Split the data
     X_train, X_test, y_train, y_test = train_test_split(df[['numerical_post', 'nr_of_words', 'nr_of_characters']],
                                                         df['label'], test_size=0.2, random_state=42)
@@ -71,27 +82,24 @@ if __name__ == '__main__':
     for epoch in range(num_epochs):
         total_loss = 0
         for index in range(len(X_train)):
-            input_tensor = torch.tensor(X_train_post_list[index], dtype=torch.long).unsqueeze(0)  # Shape: (1, seq_len)
-            label_tensor = torch.tensor([y_train_list[index]], dtype=torch.long)  # Ensure batch shape: (1,)
-            hidden = model.init_hidden()
+            input_tensor = torch.tensor(X_train_post_list[index], dtype=torch.long).unsqueeze(0).to(device)
+            label_tensor = torch.tensor([y_train_list[index]], dtype=torch.long).to(device)
+            hidden = model.init_hidden().to(device)
 
             optimizer.zero_grad()
 
-            # Process each word in the sequence
             outputs = []
-            for word in input_tensor[0]:  # Iterate through words in the sequence
+            for word in input_tensor[0]:
                 output, hidden = model(word.unsqueeze(0), hidden)
                 outputs.append(output)
 
-            # Aggregate outputs (e.g., average over the sequence)
-            output = torch.stack(outputs).mean(dim=0)  # Shape: (1, num_classes)
-
-            # Compute loss
+            output = torch.stack(outputs).mean(dim=0)
             loss = criterion(output, label_tensor)
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
 
         print(f"Epoch {epoch + 1}, Loss: {total_loss:.4f}")
+
     # Save the model
-    torch.save(model, 'rnn_model.pth')
+    torch.save(model.state_dict(), 'rnn_model.pth')
