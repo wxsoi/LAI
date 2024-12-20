@@ -71,21 +71,27 @@ if __name__ == '__main__':
     for epoch in range(num_epochs):
         total_loss = 0
         for index in range(len(X_train)):
-            input_tensor = torch.tensor(X_train_post_list[index], dtype=torch.long).unsqueeze(0)
-            print(X_train_post_list[index])
-            print(y_train_list[index])
-            label_tensor = torch.tensor(y_train_list[index], dtype=torch.long)
+            input_tensor = torch.tensor(X_train_post_list[index], dtype=torch.long).unsqueeze(0)  # Shape: (1, seq_len)
+            label_tensor = torch.tensor([y_train_list[index]], dtype=torch.long)  # Ensure batch shape: (1,)
             hidden = model.init_hidden()
 
             optimizer.zero_grad()
-            for word in input_tensor[0]:
-                output, hidden = model(word.unsqueeze(0), hidden)
 
-            print('output:', output.shape)
-            print('label_tensor:', label_tensor.shape)
+            # Process each word in the sequence
+            outputs = []
+            for word in input_tensor[0]:  # Iterate through words in the sequence
+                output, hidden = model(word.unsqueeze(0), hidden)
+                outputs.append(output)
+
+            # Aggregate outputs (e.g., average over the sequence)
+            output = torch.stack(outputs).mean(dim=0)  # Shape: (1, num_classes)
+
+            # Compute loss
             loss = criterion(output, label_tensor)
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
 
         print(f"Epoch {epoch + 1}, Loss: {total_loss:.4f}")
+    # Save the model
+    torch.save(model, 'rnn_model.pth')
