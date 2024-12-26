@@ -110,3 +110,7 @@ if test_val_overlap:
     print(f"Overlap between test and validation sets: {test_val_overlap}")
 else:
     print("No overlap between test and validation sets.")
+
+train_set.to_csv('./data/train.csv', index=False)
+test_set.to_csv('./data/test.csv', index=False)
+val_set.to_csv('./data/val.csv', index=False)
