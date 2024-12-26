@@ -3,16 +3,10 @@ import time
 from multiprocessing import Pool, cpu_count
 import numpy as np
 import pandas as pd
-import nltk
 from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
 from gensim.parsing.preprocessing import remove_stopwords
 import contractions
-from textblob import Word
-import stanza
-
-# Initialize the Stanza pipeline
-nlp = stanza.Pipeline(lang='en', processors='tokenize,mwt,pos,lemma')
 
 # Define a series of regex patterns and replacements to remove formatting
 patterns = [
@@ -48,24 +42,6 @@ patterns = [
 ]
 
 
-def is_english_word(tokens):
-    """
-    Determines if a word is in English or a close typo. Retains if so, removes otherwise.
-
-    Args:
-        tokens (list): The list of tokens to check
-
-    Returns:
-        correct_tokens (list): The list of tokens with >=85% probability being English
-    """
-    correct_tokens = []
-    for token in tokens:
-        suggestion = Word(token).spellcheck()[0]
-        if suggestion[1] >= 0.85: # 85% threshold
-            correct_tokens.append(suggestion[0])
-    return correct_tokens
-
-
 def remove_reddit_formatting(text):
     for pattern, replacement in patterns:
         text = pattern.sub(replacement, text)
@@ -82,12 +58,8 @@ def clean_and_correct_text(text):
     text = contractions.fix(text) # expand contractions
     text = remove_stopwords(text) # Use gensim's remove_stopwords
     text = re.sub(r'[^\w\s]+', '', text) # remove symbols
-    # tokens = nltk.word_tokenize(text) # tokenize
-    # correct_tokens = is_english_word(tokens) # check if its english and autocorrect
-    # corrected_words = ' '.join(tokens) # Join tokens back into a string
-    doc = nlp(text) # lemmatization
-    text = ' '.join([word.lemma for sentence in doc.sentences for word in sentence.words])
     return text
+
 
 def parallelize_dataframe(df, func, num_partitions=None):
     """
@@ -126,7 +98,7 @@ if __name__ == '__main__':
     start_time = time.time()  # Start timer
     df = pd.read_csv("./data/political_leaning.csv")
     df.rename(columns={'auhtor_ID': 'author_ID'}, inplace=True)
-    df = df.head(100)
+    # df = df.head(100)
 
     # Apply parallel processing
     df = parallelize_dataframe(df, process_partition)
@@ -138,10 +110,9 @@ if __name__ == '__main__':
     # Label Encoding
     le = LabelEncoder()
     df['label'] = le.fit_transform(df['political_leaning'])
-    df = df.drop(columns=['political_leaning'], axis=1)
-    #df = df.drop(columns=['post', 'political_leaning'], axis=1)
+    df = df.drop(columns=['post', 'political_leaning'], axis=1)
 
-    df.to_csv('./data/first100test.csv', index=False)
+    df.to_csv('./data/nolemma&autocorrect.csv', index=False)
 
     end_time = time.time()  # End timer
     print(f"Total execution time: {end_time - start_time:.2f} seconds")
