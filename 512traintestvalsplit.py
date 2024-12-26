@@ -31,26 +31,24 @@ df = df.drop('processed_post', axis=1)
 df = df.rename(columns={'processed_post_split': 'processed_post'})
 print(df["label"].value_counts(normalize=True)*len(df))
 
-# Check if any userID is associated with multiple political leanings
+# Check if any author is associated with multiple political leanings
 multiple_leanings = df.groupby("author_ID")["label"].nunique()
 
 # Filter out users with more than one unique political leaning
 conflicting_users = multiple_leanings[multiple_leanings > 1]
-
 if not conflicting_users.empty:
     print("Users with multiple political leanings detected:")
     print(conflicting_users)
 else:
     print("No users with multiple political leanings found.")
 
-# Step 1: Group data by userID to ensure unique users in each split.
+# Group data by author_ID to ensure unique users in each split
 user_groups = df.groupby("author_ID")
 
-# Step 2: Create a new DataFrame with one representative row per user.
-# This will help in splitting based on unique users.
+# Create a new DataFrame with one representative row per user
 unique_users = user_groups.first().reset_index()
 
-# Step 3: Split the unique users into train, test, and validation sets.
+# Split the unique users into train, test, and validation sets
 train_users, temp_users = train_test_split(
     unique_users,
     test_size=0.3,  # 30% for test + validation
@@ -65,12 +63,12 @@ test_users, val_users = train_test_split(
     random_state=15
 )
 
-# Step 4: Extract the original data for these user splits.
+# Extract the original data for these user splits
 train_set = df[df["author_ID"].isin(train_users["author_ID"])]
 test_set = df[df["author_ID"].isin(test_users["author_ID"])]
 val_set = df[df["author_ID"].isin(val_users["author_ID"])]
 
-# Step 5: Verify the splits.
+# Verify the splits
 train_ratio = len(train_set) / len(df)
 test_ratio = len(test_set) / len(df)
 val_ratio = len(val_set) / len(df)
@@ -79,7 +77,7 @@ print("Train ratio:", train_ratio)
 print("Test ratio:", test_ratio)
 print("Validation ratio:", val_ratio)
 
-# Step 6: Verify the distribution of political leaning i each set.
+# Verify the distribution of political leaning of each set
 print("Train political leaning distribution:")
 print(train_set["label"].value_counts(normalize=True))
 
