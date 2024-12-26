@@ -14,7 +14,7 @@ def split_text_exact(text, max_words=512):
         chunks.append(chunk_text)
     return chunks
 
-df = pd.read_csv("./data/cleaned_2.csv")
+df = pd.read_csv("./data/english-sampled-cleaned.csv")
 
 # Apply the split_text_exact function to the processed_post column
 df['processed_post_split'] = df['processed_post'].apply(split_text_exact)
@@ -53,14 +53,14 @@ train_users, temp_users = train_test_split(
     unique_users,
     test_size=0.3,  # 30% for test + validation
     stratify=unique_users["label"],
-    random_state=3
+    random_state=1
 )
 
 test_users, val_users = train_test_split(
     temp_users,
     test_size=(1/3),  # 33% of 30% -> 10% of total
     stratify=temp_users["label"],
-    random_state=15
+    random_state=1
 )
 
 # Extract the original data for these user splits
@@ -110,3 +110,7 @@ if test_val_overlap:
     print(f"Overlap between test and validation sets: {test_val_overlap}")
 else:
     print("No overlap between test and validation sets.")
+
+train_set.to_csv('./data/train.csv', index=False)
+test_set.to_csv('./data/test.csv', index=False)
+val_set.to_csv('./data/val.csv', index=False)
