@@ -55,7 +55,7 @@ balanced_df = grouped.apply(lambda x: x.sample(n=min_size, random_state=42)).res
 print(balanced_df['political_leaning'].value_counts(normalize=True))
 print(f"Balanced Dataset Size: {len(balanced_df)}")
 
-pd.DataFrame(balanced_df).to_csv('.data/political_leaning_sample_en.csv')
+pd.DataFrame(balanced_df).to_csv('./data/political_leaning_sample_en.csv')
 
 # dfs = np.array_split(balanced_df, 14)
 # counter = 1
