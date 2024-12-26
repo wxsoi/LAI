@@ -96,7 +96,7 @@ def process_partition(df_partition):
 
 if __name__ == '__main__':
     start_time = time.time()  # Start timer
-    df = pd.read_csv("./data/political_leaning.csv")
+    df = pd.read_csv("./data/political_leaning_sample_en.csv")
     df.rename(columns={'auhtor_ID': 'author_ID'}, inplace=True)
     # df = df.head(100)
 
@@ -110,9 +110,9 @@ if __name__ == '__main__':
     # Label Encoding
     le = LabelEncoder()
     df['label'] = le.fit_transform(df['political_leaning'])
-    df = df.drop(columns=['post', 'political_leaning'], axis=1)
+    df = df.drop(columns=['post'], axis=1)
 
-    df.to_csv('./data/nolemma&autocorrect.csv', index=False)
+    df.to_csv('./data/english-sampled-cleaned.csv', index=False)
 
     end_time = time.time()  # End timer
     print(f"Total execution time: {end_time - start_time:.2f} seconds")
