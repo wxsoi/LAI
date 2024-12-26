@@ -9,12 +9,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-df = pd.read_csv("./data/cleaned.csv")
+df = pd.read_csv("./data/political_leaning_en.csv")
 # df.rename(columns={'auhtor_ID': 'author_ID'}, inplace=True)
 df.info()
 
 
-print(df['label'].value_counts(normalize=True))
+print(df['political_leaning'].value_counts(normalize=True))
 
 
 post_counts = df.groupby('author_ID').size().sort_values(ascending=False)
@@ -45,17 +45,17 @@ print(f"New dataset size: {len(df_resampled)}")
 df_resampled.head()
 
 
-grouped = df_resampled.groupby('label')
+grouped = df_resampled.groupby('political_leaning')
 min_size = min(grouped.size())
 
 # Sample equal number of posts from each group (33% each)
 balanced_df = grouped.apply(lambda x: x.sample(n=min_size, random_state=42)).reset_index(drop=True)
 
 # Check distribution
-print(balanced_df['label'].value_counts(normalize=True))
+print(balanced_df['political_leaning'].value_counts(normalize=True))
 print(f"Balanced Dataset Size: {len(balanced_df)}")
 
-pd.DataFrame(df).to_csv('data/cleaned_2.csv')
+pd.DataFrame(balanced_df).to_csv('.data/political_leaning_sample_en.csv')
 
 # dfs = np.array_split(balanced_df, 14)
 # counter = 1
