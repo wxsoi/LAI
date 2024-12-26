@@ -1,12 +1,10 @@
+import nltk
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torchtext
 from sklearn.model_selection import train_test_split
-from torchtext.data import get_tokenizer
-from torchtext.vocab import build_vocab_from_iterator
 
 
 class RNN(nn.Module):
@@ -32,14 +30,92 @@ class RNN(nn.Module):
         return torch.zeros(1, self.hidden_size)
 
 
-# Convert text to numerical data
-def text_pipeline(text):
-    return vocab(tokenizer(text))
+def train(model, X, y):
+    model.to(device)  # Move the model to the correct device
+    X_train_post_list = X["numerical_post"].tolist()
+    y_train_list = y.tolist()
+
+    for epoch in range(num_epochs):
+        total_loss = 0
+        for index in range(len(X)):
+            input_tensor = torch.tensor(X_train_post_list[index], dtype=torch.long).unsqueeze(0).to(device)
+            label_tensor = torch.tensor([y_train_list[index]], dtype=torch.long).to(device)
+            hidden = model.init_hidden().to(device)
+
+            optimizer.zero_grad()
+
+            outputs = []
+            for word in input_tensor[0]:
+                word_tensor = word.unsqueeze(0).to(device)
+                output, hidden = model(word_tensor, hidden)
+                outputs.append(output)
+
+            output = torch.stack(outputs).mean(dim=0)
+            loss = criterion(output, label_tensor)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+
+        print(f"Epoch {epoch + 1}, Loss: {total_loss:.4f}")
+
+    # Save the model
+    torch.save(model.state_dict(), 'rnn_model.pth')
+
+
+def tokenize(text):
+    return nltk.word_tokenize(text)  # tokenize
+
+
+def build_vocab(corpus):
+    """Build a vocabulary mapping tokens to indices."""
+    vocab = {"<unk>": 0}
+    for text in corpus:
+        for token in tokenize(text):
+            if token not in vocab:
+                vocab[token] = len(vocab)
+    return vocab
+
+
+def text_to_indices(text, vocab):
+    """Convert text into a list of indices based on the vocabulary."""
+    return [vocab.get(token, vocab["<unk>"]) for token in tokenize(text)]
+
+
+def test(model, X, y):
+    model.eval()  # Set the model to evaluation mode
+    model.to(device)  # Ensure the model is on the correct device
+
+    X_test_post_list = X["numerical_post"].tolist()
+    y_test_list = y.tolist()
+
+    correct = 0
+    total = 0
+
+    with torch.no_grad():  # Disable gradient computation for testing
+        for index in range(len(X)):
+            input_tensor = torch.tensor(X_test_post_list[index], dtype=torch.long).unsqueeze(0).to(device)
+            label_tensor = torch.tensor([y_test_list[index]], dtype=torch.long).to(device)
+            hidden = model.init_hidden().to(device)
+
+            outputs = []
+            for word in input_tensor[0]:
+                word_tensor = word.unsqueeze(0).to(device)
+                output, hidden = model(word_tensor, hidden)
+                outputs.append(output)
+
+            output = torch.stack(outputs).mean(dim=0)
+            predicted_label = output.argmax(dim=1).item()  # Get the predicted class
+
+            if predicted_label == label_tensor.item():
+                correct += 1
+            total += 1
+
+    accuracy = correct / total * 100
+    print(f"Test Accuracy: {accuracy:.2f}%")
+    return accuracy
 
 
 if __name__ == '__main__':
-    torchtext.disable_torchtext_deprecation_warning()
-
     # Hyperparameters
     embedding_dim = 50
     hidden_size = 128
@@ -47,19 +123,14 @@ if __name__ == '__main__':
     learning_rate = 0.01
     num_epochs = 10
 
-    df = pd.read_csv('./data/clean.csv')
-    df = df.head(100)
-
-    print(f"Is CUDA supported by this system? {torch.cuda.is_available()}")
-    print(f"CUDA version: {torch.version.cuda}")
-
-    tokenizer = get_tokenizer("basic_english")
+    df = pd.read_csv('./data/cleaned.csv')
+    df = df.sample(2000, random_state=42)
+    print(df.describe())
 
     # Build Vocabulary
-    vocab = build_vocab_from_iterator(df["clean_post"], specials=["<unk>"])
-    vocab.set_default_index(vocab["<unk>"])
+    vocab = build_vocab(df["processed_post"])
 
-    df["numerical_post"] = df["clean_post"].apply(text_pipeline)
+    df["numerical_post"] = df["processed_post"].apply(lambda x: text_to_indices(x, vocab))
 
     # Instantiate the model, loss function, and optimizer
     vocab_size = len(vocab)
@@ -75,31 +146,8 @@ if __name__ == '__main__':
     X_train, X_test, y_train, y_test = train_test_split(df[['numerical_post', 'nr_of_words', 'nr_of_characters']],
                                                         df['label'], test_size=0.2, random_state=42)
 
-    # Training loop
-    X_train_post_list = X_train["numerical_post"].tolist()
-    y_train_list = y_train.tolist()
+    train(model, X_train, y_train)
 
-    for epoch in range(num_epochs):
-        total_loss = 0
-        for index in range(len(X_train)):
-            input_tensor = torch.tensor(X_train_post_list[index], dtype=torch.long).unsqueeze(0).to(device)
-            label_tensor = torch.tensor([y_train_list[index]], dtype=torch.long).to(device)
-            hidden = model.init_hidden().to(device)
-
-            optimizer.zero_grad()
-
-            outputs = []
-            for word in input_tensor[0]:
-                output, hidden = model(word.unsqueeze(0), hidden)
-                outputs.append(output)
-
-            output = torch.stack(outputs).mean(dim=0)
-            loss = criterion(output, label_tensor)
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
-
-        print(f"Epoch {epoch + 1}, Loss: {total_loss:.4f}")
-
-    # Save the model
-    torch.save(model.state_dict(), 'rnn_model.pth')
+    # Load the model weights
+    # model.load_state_dict(torch.load('rnn_model_2.pth'))
+    test(model, X_test, y_test)
