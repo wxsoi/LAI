@@ -120,7 +120,7 @@ if __name__ == '__main__':
     embedding_dim = 50
     hidden_size = 128
     output_size = 3
-    learning_rate = 0.01
+    learning_rate = 0.05
     num_epochs = 10
 
     df = pd.read_csv('./data/cleaned.csv')
