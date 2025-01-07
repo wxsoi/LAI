@@ -2,7 +2,6 @@ from transformers import Trainer, TrainingArguments
 from transformers import BertTokenizer, BertForSequenceClassification
 from transformers import DataCollatorWithPadding
 from transformers import TrainerCallback, TrainerState, TrainerControl
-from sklearn.model_selection import train_test_split
 from datasets import Dataset
 import optuna
 import torch
@@ -15,10 +14,11 @@ from sklearn.metrics import (classification_report, accuracy_score, f1_score,
                              precision_score, recall_score, confusion_matrix)
 
 # CONSTANTS
-# data_path = "./data/test2.csv"
-data_path = "./data/cleaned_split_512v2_sampled5k.csv"
+train_path = "./data/train.csv"
+val_path = "./data/val.csv"
+test_path = "./data/test.csv"
 model_variant = "bert-small"     # tiny, mini, small, medium
-num_trials = 18
+num_trials = 3
 
 # Configure logging
 if not path.exists('logging'):
@@ -53,14 +53,13 @@ class LoggingCallback(TrainerCallback):
         # Add a whitespace line after the complete logging event
         logging.info("\n")
 
-df = pd.read_csv(data_path)     # load df
+train_df = pd.read_csv(train_path)
+val_df = pd.read_csv(val_path)
+test_df = pd.read_csv(test_path)
 
-# Split dataset into train-evaluation-test (64-16-20)
-train_df, test_df = train_test_split(df, test_size=0.2, stratify=df['label'])       # train-test split
-train_df, evaluation_df = train_test_split(train_df, test_size=0.2, stratify=train_df['label'])   # train-evaluation split
-# Convert df to suitable Dataset format for transformers
+# Convert df's to suitable Dataset format for transformers
 train_dataset = Dataset.from_pandas(train_df)
-evaluation_dataset = Dataset.from_pandas(evaluation_df)
+evaluation_dataset = Dataset.from_pandas(val_df)
 test_dataset = Dataset.from_pandas(test_df)
 
 # Load tokenizer and model
@@ -209,7 +208,7 @@ print_custom('Saving the best Optuna tuned model')
 if not path.exists('model'):
     os.mkdir('model')
 
-model_path = "model/{}".format(f"{data_path}_{model_variant}_{current_time}")
+model_path = "model/{}".format(f"final_data_{model_variant}_{current_time}")
 model.save_pretrained(model_path)
 tokenizer.save_pretrained(model_path)
 
