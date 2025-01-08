@@ -14,11 +14,12 @@ from sklearn.metrics import (classification_report, accuracy_score, f1_score,
                              precision_score, recall_score, confusion_matrix)
 
 # CONSTANTS
-train_path = "./data/train.csv"
-val_path = "./data/val.csv"
-test_path = "./data/test.csv"
-model_variant = "bert-small"     # tiny, mini, small, medium
-num_trials = 3
+debiased_dataset = True     # to determine which column of text the model will use; True for debiased_post
+train_path = "./data/train_debiased_100.csv"
+val_path = "./data/val_debiased_100.csv"
+test_path = "./data/test_debiased_100.csv"
+model_variant = "bert-mini"     # tiny, mini, small, medium
+num_trials = 12
 
 # Configure logging
 if not path.exists('logging'):
@@ -73,14 +74,23 @@ model.to(device)
 
 # Tokenize text in df with truncation
 def encode(dataset):
-    outputs = tokenizer(
-        dataset['processed_post'], truncation=True, padding='max_length',
+    if debiased_dataset:
+        outputs = tokenizer(
+            dataset['debiased_post'], truncation=True, padding='max_length',
+                max_length=512)
+    else:
+        outputs = tokenizer(
+            dataset['processed_post'], truncation=True, padding='max_length',
             max_length=512)
     return outputs
 
+# Apply the tokenization function to all datasets and rename the label columns for expected format
 train_dataset = train_dataset.map(encode, batched=True)
+train_dataset = train_dataset.rename_column('label', 'labels')
 evaluation_dataset = evaluation_dataset.map(encode, batched=True)
+evaluation_dataset = evaluation_dataset.rename_column('label', 'labels')
 test_dataset = test_dataset.map(encode, batched=True)
+test_dataset = test_dataset.rename_column('label', 'labels')
 
 # Data collator to dynamically pad sequences in each batch
 data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
