@@ -2,7 +2,6 @@ from transformers import Trainer, TrainingArguments
 from transformers import BertTokenizer, BertForSequenceClassification
 from transformers import DataCollatorWithPadding
 from transformers import TrainerCallback, TrainerState, TrainerControl
-from sklearn.model_selection import train_test_split
 from datasets import Dataset
 import optuna
 import torch
@@ -15,10 +14,12 @@ from sklearn.metrics import (classification_report, accuracy_score, f1_score,
                              precision_score, recall_score, confusion_matrix)
 
 # CONSTANTS
-# data_path = "./data/test2.csv"
-data_path = "./data/cleaned_split_512v2_sampled5k.csv"
-model_variant = "bert-small"     # tiny, mini, small, medium
-num_trials = 18
+debiased_dataset = True     # to determine which column of text the model will use; True for debiased_post
+train_path = "./data/train_debiased_500.csv"
+val_path = "./data/val_debiased_500.csv"
+test_path = "./data/test_debiased_500.csv"
+model_variant = "bert-mini"     # tiny, mini, small, medium
+num_trials = 12
 
 # Configure logging
 if not path.exists('logging'):
@@ -53,14 +54,13 @@ class LoggingCallback(TrainerCallback):
         # Add a whitespace line after the complete logging event
         logging.info("\n")
 
-df = pd.read_csv(data_path)     # load df
+train_df = pd.read_csv(train_path)
+val_df = pd.read_csv(val_path)
+test_df = pd.read_csv(test_path)
 
-# Split dataset into train-evaluation-test (64-16-20)
-train_df, test_df = train_test_split(df, test_size=0.2, stratify=df['label'])       # train-test split
-train_df, evaluation_df = train_test_split(train_df, test_size=0.2, stratify=train_df['label'])   # train-evaluation split
-# Convert df to suitable Dataset format for transformers
+# Convert df's to suitable Dataset format for transformers
 train_dataset = Dataset.from_pandas(train_df)
-evaluation_dataset = Dataset.from_pandas(evaluation_df)
+evaluation_dataset = Dataset.from_pandas(val_df)
 test_dataset = Dataset.from_pandas(test_df)
 
 # Load tokenizer and model
@@ -74,14 +74,23 @@ model.to(device)
 
 # Tokenize text in df with truncation
 def encode(dataset):
-    outputs = tokenizer(
-        dataset['processed_post'], truncation=True, padding='max_length',
+    if debiased_dataset:
+        outputs = tokenizer(
+            dataset['debiased_post'], truncation=True, padding='max_length',
+                max_length=512)
+    else:
+        outputs = tokenizer(
+            dataset['processed_post'], truncation=True, padding='max_length',
             max_length=512)
     return outputs
 
+# Apply the tokenization function to all datasets and rename the label columns for expected format
 train_dataset = train_dataset.map(encode, batched=True)
+train_dataset = train_dataset.rename_column('label', 'labels')
 evaluation_dataset = evaluation_dataset.map(encode, batched=True)
+evaluation_dataset = evaluation_dataset.rename_column('label', 'labels')
 test_dataset = test_dataset.map(encode, batched=True)
+test_dataset = test_dataset.rename_column('label', 'labels')
 
 # Data collator to dynamically pad sequences in each batch
 data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
@@ -209,7 +218,7 @@ print_custom('Saving the best Optuna tuned model')
 if not path.exists('model'):
     os.mkdir('model')
 
-model_path = "model/{}".format(f"{data_path}_{model_variant}_{current_time}")
+model_path = "model/{}".format(f"final_data_{model_variant}_{current_time}")
 model.save_pretrained(model_path)
 tokenizer.save_pretrained(model_path)
 
@@ -230,7 +239,7 @@ predictions = trainer.predict(test_dataset)
 predicted_labels = predictions.predictions.argmax(-1)
 
 # Get actual labels from unseen test dataset
-actual_labels = [example['label'] for example in test_dataset]
+actual_labels = [example['labels'] for example in test_dataset]
 
 # Calculate metrics
 accuracy = accuracy_score(actual_labels, predicted_labels)
@@ -244,10 +253,6 @@ conf_matrix = confusion_matrix(actual_labels, predicted_labels)
 conf_matrix_df = pd.DataFrame(conf_matrix, index=["Actual 0", "Actual 1", "Actual 2"],
                               columns=["Pred 0", "Pred 1", "Pred 2"])
 
-# Logging metrics
-logging.info("FINISHED EVALUATION")
-logging.info("-----------------------------------\n")
-
 logging.info(f"Accuracy: {accuracy}")
 logging.info(f"F1 Score: {f1}")
 logging.info(f"Precision: {precision}")
@@ -256,3 +261,7 @@ logging.info("\nClassification Report:\n")
 logging.info(class_report)
 logging.info("\nConfusion Matrix:\n")
 logging.info(conf_matrix_df)
+
+# Logging metrics
+logging.info("FINISHED EVALUATION")
+logging.info("-----------------------------------\n")
