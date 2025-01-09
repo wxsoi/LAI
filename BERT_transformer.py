@@ -15,9 +15,9 @@ from sklearn.metrics import (classification_report, accuracy_score, f1_score,
 
 # CONSTANTS
 debiased_dataset = True     # to determine which column of text the model will use; True for debiased_post
-train_path = "./data/train_debiased_100.csv"
-val_path = "./data/val_debiased_100.csv"
-test_path = "./data/test_debiased_100.csv"
+train_path = "./data/train_debiased_500.csv"
+val_path = "./data/val_debiased_500.csv"
+test_path = "./data/test_debiased_500.csv"
 model_variant = "bert-mini"     # tiny, mini, small, medium
 num_trials = 12
 
@@ -239,7 +239,7 @@ predictions = trainer.predict(test_dataset)
 predicted_labels = predictions.predictions.argmax(-1)
 
 # Get actual labels from unseen test dataset
-actual_labels = [example['label'] for example in test_dataset]
+actual_labels = [example['labels'] for example in test_dataset]
 
 # Calculate metrics
 accuracy = accuracy_score(actual_labels, predicted_labels)
@@ -253,10 +253,6 @@ conf_matrix = confusion_matrix(actual_labels, predicted_labels)
 conf_matrix_df = pd.DataFrame(conf_matrix, index=["Actual 0", "Actual 1", "Actual 2"],
                               columns=["Pred 0", "Pred 1", "Pred 2"])
 
-# Logging metrics
-logging.info("FINISHED EVALUATION")
-logging.info("-----------------------------------\n")
-
 logging.info(f"Accuracy: {accuracy}")
 logging.info(f"F1 Score: {f1}")
 logging.info(f"Precision: {precision}")
@@ -265,3 +261,7 @@ logging.info("\nClassification Report:\n")
 logging.info(class_report)
 logging.info("\nConfusion Matrix:\n")
 logging.info(conf_matrix_df)
+
+# Logging metrics
+logging.info("FINISHED EVALUATION")
+logging.info("-----------------------------------\n")
