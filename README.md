@@ -33,7 +33,7 @@ Unfortunately, we cannot share the Reddit data directly under a data agreement.
 2. ...
 
 ### Logistic Regression
-- For Logistic Regression, run `logisticregression_hypertuning.ipynb` for all test sets.
+- For Logistic Regression, run `logisticregression_hypertuning.ipynb` for all training, validation, and test sets.
 
 ### XGBoost
 - ...
