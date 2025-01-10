@@ -89,7 +89,7 @@ def objective(trial: optuna.Trial):
     return eval_result['eval_loss']     # eval loss
 
 if __name__ == '__main__':
-    # CONSTANTS
+    # Constants (Change)
     debiased_dataset = True  # to determine which column of text the model will use; True for debiased_post
     train_path = "./data/train_debiased_500.csv"
     val_path = "./data/val_debiased_500.csv"
@@ -219,7 +219,7 @@ if __name__ == '__main__':
     if not path.exists('model'):
         os.mkdir('model')
 
-    model_path = "model/{}".format(f"final_data_{model_variant}_{current_time}")
+    model_path = "model/{}".format(f"{model_variant}_{current_time}")
     model.save_pretrained(model_path)
     tokenizer.save_pretrained(model_path)
 
@@ -263,6 +263,7 @@ if __name__ == '__main__':
     logging.info(class_report)
     logging.info("\nConfusion Matrix:\n")
     logging.info(conf_matrix_df)
+    logging.info("")
 
     # Logging metrics
     logging.info("FINISHED EVALUATION")
