@@ -16,6 +16,7 @@ This repository is used for experiments described in 'Mitigating Data Pollution 
 
 ## tl;dr
 [//]: # (A tl;dr which highlights some points why someone who found your research code should care about this repository.)
+This project is focused on the data polution in Reddit posts. It tackles bias and uses pre-processing to remove clutter for the models. The different models (XGBoost, Logistic Regression, BERT, RNN) are hypertuned and evaluated using F1 and accuracy. 
 
 ## Reproduction
 Follow the instruction in the below subsection. The first two section have to be done first in that order. The section for the models can be done in any order, once the data is in order.
@@ -37,6 +38,7 @@ Unfortunately, we cannot share the Reddit data directly under a data agreement.
 ### XGBoost
 - Run `xgboost.py`, specifically `evaluate_baseline_debiased()` and `run_experiments()` functions to run the baseline first and on the debiased testset after. It includes hypertuning and running the model on the best parameters found.
 
+
 ### BERT
 1. Run `BERT_transformer.py` to train models
 > Change train_path, val_path and test_path based on the path to the data. Make sure the train, val and test datasets are from the same type (original or either of the debiased datasets) 
@@ -47,4 +49,10 @@ Change debiased_dataset based on whether you are running the original dataset or
 Change model_path to the path of the saved original model. It should be saved under model/BERT-mini-{time}. If you trained the original model in step 1 first, then it should be the first in the 'model' directory.
 Debiased_dataset should remain True for testing on the debiased dataset
 
+### RNN
+1. Run `RNN.py` to run a hypertuning session or to run a training session.
+> Change train_df, val_df and test_df based on the path to the data. Make sure the train, val and test datasets are from the same type (original or either of the debiased datasets) 
+> Change the mode to 'hypertune' or 'train' depending on which function you want to use.
+
 ## Dependencies
+The dependencies are seen in `requirements.txt`.
