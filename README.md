@@ -38,7 +38,6 @@ Unfortunately, we cannot share the Reddit data directly under a data agreement.
 ### XGBoost
 - Run `xgboost.py`, specifically `evaluate_baseline_debiased()` and `run_experiments()` functions to run the baseline first and on the debiased testset after. It includes hypertuning and running the model on the best parameters found.
 
-
 ### BERT
 1. Run `BERT_transformer.py` to train models
 > Change train_path, val_path and test_path based on the path to the data. Make sure the train, val and test datasets are from the same type (original or either of the debiased datasets) 
