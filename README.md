@@ -24,19 +24,18 @@ Unfortunately, we cannot share the Reddit data directly under a data agreement.
 
 ### Data Preprocessing
 1. Run `language-detect.py` to remove the majority non-English rows
-2. Run `DataPreprocessing.py` to sample 33% for each political label
+2. Run `DataPreprocessing.py` to sample 33% for each political label and remove the 95th percentile of user rows/posts
 3. Run `cleaning.py` to preprocess the data
 4. Run `512traintestval.py` to tokenize them into 512 tokens and split for training, testing, and validation sets
 
 ### Data Debiasing
-1. ...
-2. ...
+1. Run `xgboost.py`, specifically `debiasing_dataset()` function to remove the biased words that are detected by XGBoost's SHAP importance.
 
 ### Logistic Regression
-- For Logistic Regression, run `logisticregression_hypertuning.ipynb` for all training, validation, and test sets.
+- For Logistic Regression, run `logisticregression_hypertuning.ipynb` for all test sets.
 
 ### XGBoost
-- ...
+- Run `xgboost.py`, specifically `evaluate_baseline_debiased()` and `run_experiments()` functions to run the baseline first and on the debiased testset after. It includes hypertuning and running the model on the best parameters found.
 
 ### BERT
 1. Run `BERT_transformer.py` to train models
