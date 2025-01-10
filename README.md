@@ -48,6 +48,10 @@ Change debiased_dataset based on whether you are running the original dataset or
 Change model_path to the path of the saved original model. It should be saved under model/BERT-mini-{time}. If you trained the original model in step 1 first, then it should be the first in the 'model' directory.
 Debiased_dataset should remain True for testing on the debiased dataset
 
+### RNN
+1. Run `RNN.py` to train or hypertune the model 
+> Change train_df, val_df and test_df based on the path to the data. Make sure the train, val and test datasets are from the same type (original or either of the debiased datasets) 
+> Change mode based on if you want to 'hypertune' or 'train'
 ## Dependencies
 The packages that are used throughout all files
 ```
