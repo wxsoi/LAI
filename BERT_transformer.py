@@ -34,9 +34,14 @@ class LoggingCallback(TrainerCallback):
         # Add a whitespace line after the complete logging event
         logging.info("\n")
 
-# Tokenize text in df with truncation
-def encode(dataset):
-    if debiased_dataset:
+def encode(dataset, dataset_bias):
+    """
+    Tokenizes text in df with truncation
+    :param dataset: dataframe with a 'processed_post' and/or and 'debiased_post' column
+    :param dataset_bias: true/false whether to use 'debiased_post' or 'processed_post' column
+    :return: tokenized dataset
+    """
+    if dataset_bias:
         outputs = tokenizer(
             dataset['debiased_post'], truncation=True, padding='max_length',
                 max_length=512)
@@ -56,9 +61,9 @@ def objective(trial: optuna.Trial):
 
     training_args = TrainingArguments(
         output_dir='./results',
-        evaluation_strategy='epoch',
-        learning_rate=trial.suggest_loguniform('learning_rate', low=1e-6, high=1e-4),
-        weight_decay=trial.suggest_loguniform('weight_decay', 1e-3, 0.15),
+        eval_strategy='epoch',
+        learning_rate=trial.suggest_float('learning_rate', low=1e-6, high=1e-4, log=True),
+        weight_decay=trial.suggest_float('weight_decay', 1e-3, 0.15, log=True),
         num_train_epochs=trial.suggest_int('num_train_epochs', low=2, high=10),
         per_device_train_batch_size=trial.suggest_int('per_device_train_batch_size', low=8, high=64),
         per_device_eval_batch_size=32,
@@ -92,12 +97,21 @@ if __name__ == '__main__':
     model_variant = "bert-mini"  # tiny, mini, small, medium
     num_trials = 12
 
+    # Seeds
+    seed = 7
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
     # Configure logging
     if not path.exists('logging'):
         os.mkdir('logging')
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     logging.basicConfig(filename=f"./logging/optuna_logs_{current_time}.log", level=logging.INFO,
                         format="%(asctime)s - %(levelname)s - %(message)s")
+
+    # ----------------------------------------------------------------------------------------------------
+    #                   DATA SETUP
+    # ----------------------------------------------------------------------------------------------------
 
     # Import data from csv's
     train_df = pd.read_csv(train_path)
@@ -119,11 +133,11 @@ if __name__ == '__main__':
     model.to(device)
 
     # Apply the tokenization function to all datasets and rename the label columns for expected format
-    train_dataset = train_dataset.map(encode, batched=True)
+    train_dataset = train_dataset.map(lambda x: encode(x, debiased_dataset), batched=True)
     train_dataset = train_dataset.rename_column('label', 'labels')
-    evaluation_dataset = evaluation_dataset.map(encode, batched=True)
+    evaluation_dataset = evaluation_dataset.map(lambda x: encode(x, debiased_dataset), batched=True)
     evaluation_dataset = evaluation_dataset.rename_column('label', 'labels')
-    test_dataset = test_dataset.map(encode, batched=True)
+    test_dataset = test_dataset.map(lambda x: encode(x, debiased_dataset), batched=True)
     test_dataset = test_dataset.rename_column('label', 'labels')
 
     # Data collator to dynamically pad sequences in each batch
@@ -136,14 +150,15 @@ if __name__ == '__main__':
     logging.info("STARTING HYPERPARAMETER TUNING")
     logging.info("-----------------------------------\n")
 
-    study = optuna.create_study(study_name='hp-search-electra', direction='minimize')  # minimize evaluation loss
+    study = optuna.create_study(study_name='hp-search-electra', direction='minimize',
+                                sampler=optuna.samplers.TPESampler(seed=seed))  # minimize evaluation loss
     study.optimize(func=objective, n_trials=num_trials, callbacks=[print_trial_info])  # callback for logging trials
 
     logging.info("FINISHED HYPERPARAMETER TUNING")
     logging.info("-----------------------------------\n")
 
     # ----------------------------------------------------------------------------------------------------
-    #                    PRINT BEST STUDY HYPERPARAMETERS
+    #                    EXTRACT AND LOG BEST HYPERPARAMETERS
     # ----------------------------------------------------------------------------------------------------
 
     best_lr = float(study.best_params['learning_rate'])
@@ -167,7 +182,7 @@ if __name__ == '__main__':
 
     training_args = TrainingArguments(
         output_dir='./results',
-        evaluation_strategy='epoch',
+        eval_strategy='epoch',
         learning_rate=best_lr,
         weight_decay=best_weight_decay,
         num_train_epochs=best_epoch,
@@ -209,7 +224,7 @@ if __name__ == '__main__':
     tokenizer.save_pretrained(model_path)
 
     # ----------------------------------------------------------------------------------------------------
-    #                   TRAINED MODEL METRICS
+    #                   TRAINED MODEL EVALUATION METRICS
     # ----------------------------------------------------------------------------------------------------
 
     # Changing logging format (Does not use "Time - Info - Text" format)
@@ -225,7 +240,7 @@ if __name__ == '__main__':
     predicted_labels = predictions.predictions.argmax(-1)
 
     # Get actual labels from unseen test dataset
-    actual_labels = [example['labels'] for example in test_dataset]
+    actual_labels = [entry['labels'] for entry in test_dataset]
 
     # Calculate metrics
     accuracy = accuracy_score(actual_labels, predicted_labels)
