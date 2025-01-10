@@ -23,9 +23,9 @@ def hypertune_model():
         dtrain (xgb.DMatrix): The training dataset in XGBoost's DMatrix format.
     """
     # Load the datasets
-    train = pd.read_csv('train.csv')
-    test = pd.read_csv('test.csv')
-    val = pd.read_csv('val.csv')
+    train = pd.read_csv('./data/train.csv')
+    test = pd.read_csv('./data/test.csv')
+    val = pd.read_csv('./data/val.csv')
 
     # Split datasets into X and y
     X_train = train['processed_post']
@@ -160,7 +160,7 @@ def debiasing_dataset(model, tfidf, dtrain):
 
     # Define thresholds and corresponding filenames
     thresholds = [10, 5, 1]
-    filenames = ['train.csv', 'test.csv', 'val.csv']
+    filenames = ['./data/train.csv', './data/test.csv', './data/val.csv']
 
     # Define a function to remove biased words from a single post
     def remove_biased_words(text, biased_words):
@@ -186,7 +186,7 @@ def debiasing_dataset(model, tfidf, dtrain):
 
             df['debiased_post'] = df['debiased_post'] .fillna('')
 
-            name = f'{filename.split('.')[0]}_debiased_{cutoff_threshold}00.csv'
+            name = f'./data/{filename.split('.')[0]}_debiased_{cutoff_threshold}00.csv'
             # Save the cleaned dataset to a file
             df.to_csv(name, index=False)
 
@@ -204,7 +204,7 @@ def evaluate_baseline_debiased(model, tfidf):
     thresholds = [10, 5, 1]
     for cutoff_threshold in thresholds:
         print(f'Threshold: {cutoff_threshold}00')
-        test = pd.read_csv(f'test_debiased_{cutoff_threshold}00.csv')
+        test = pd.read_csv(f'./data/test_debiased_{cutoff_threshold}00.csv')
         X_test = test['debiased_post'].fillna('')
         y_test = test['label']
         X_test_tfidf = tfidf.transform(X_test).toarray()
@@ -245,9 +245,9 @@ def run_experiments():
     
     for cutoff_threshold in thresholds:
         print(f'Running for threshold {cutoff_threshold}')
-        train = pd.read_csv(f'train_debiased_{cutoff_threshold}00.csv')
-        test = pd.read_csv(f'test_debiased_{cutoff_threshold}00.csv')
-        val = pd.read_csv(f'val_debiased_{cutoff_threshold}00.csv')
+        train = pd.read_csv(f'./data/train_debiased_{cutoff_threshold}00.csv')
+        test = pd.read_csv(f'./data/test_debiased_{cutoff_threshold}00.csv')
+        val = pd.read_csv(f'./data/val_debiased_{cutoff_threshold}00.csv')
 
         # Split datasets into X and y
         X_train = train['debiased_post'].fillna('')
