@@ -22,3 +22,7 @@ train_debiased_1000.csv
 val_debiased_100.csv
 val_debiased_500.csv
 val_debiased_1000.csv
+/results
+/logging
+/logs
+/model

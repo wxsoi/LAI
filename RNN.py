@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 from sklearn.model_selection import train_test_split
 import random
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import torch.nn.utils.rnn as rnn_utils
 from tqdm import tqdm
 
@@ -34,37 +34,16 @@ class RNN(nn.Module):
         return torch.zeros(1, self.hidden_size)
 
 
-def train(model, X, y):
-    model.to(device)  # Move the model to the correct device
-    X_train_post_list = X["numerical_post"].tolist()
-    y_train_list = y.tolist()
-
-    for epoch in range(num_epochs):
-        total_loss = 0
-        for index in range(len(X)):
-            input_tensor = torch.tensor(X_train_post_list[index], dtype=torch.long).unsqueeze(0).to(device)
-            label_tensor = torch.tensor([y_train_list[index]], dtype=torch.long).to(device)
-            hidden = model.init_hidden().to(device)
-            # print(input_tensor.shape)
-            optimizer.zero_grad()
-
-            outputs = []
-            for word in input_tensor[0]:
-                word_tensor = word.unsqueeze(0).to(device)
-                # print(word_tensor.shape, hidden.shape)
-                output, hidden = model(word_tensor, hidden)
-                outputs.append(output)
-
-            output = torch.stack(outputs).mean(dim=0)
-            loss = criterion(output, label_tensor)
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
-
-        print(f"Epoch {epoch + 1}, Loss: {total_loss:.4f}")
+def train(params, X_train, y_train, vocab_size, output_size, device, save=False):
+    model, optimizer = initialize_model_and_optimizer(vocab_size, output_size, params, device)
+    criterion = nn.NLLLoss()
+    for epoch in range(params['num_epochs']):
+        train_one_epoch(model, optimizer, criterion, X_train, y_train, params, device, epoch)
 
     # Save the model
-    torch.save(model.state_dict(), 'rnn_model.pth')
+    if save is True:
+        torch.save(model.state_dict(), 'rnn_model.pth')
+    return model
 
 
 def tokenize(text):
@@ -101,16 +80,13 @@ def test(model, X, y):
     X_test_post_list = X["numerical_post"].tolist()
     y_test_list = y.tolist()
 
-    correct = 0
-    total = 0
-
     with torch.no_grad():  # Disable gradient computation for testing
         for index in tqdm(range(len(X)), desc="Testing"):
             input_tensor = torch.tensor(X_test_post_list[index], dtype=torch.long).unsqueeze(0).to(device)
-            label_tensor = torch.tensor([y_test_list[index]], dtype=torch.long).to(device)
             hidden = model.init_hidden().to(device)
 
             outputs = []
+            all_preds = []
             for word in input_tensor[0]:
                 word_tensor = word.unsqueeze(0).to(device)
                 output, hidden = model(word_tensor, hidden)
@@ -118,13 +94,20 @@ def test(model, X, y):
 
             output = torch.stack(outputs).mean(dim=0)
             predicted_label = output.argmax(dim=1).item()  # Get the predicted class
+            all_preds.append(predicted_label)
 
-            if predicted_label == label_tensor.item():
-                correct += 1
-            total += 1
-
-    accuracy = correct / total * 100
+    accuracy = accuracy_score(y_test_list, all_preds)
     print(f"Test Accuracy: {accuracy:.2f}%")
+
+    # Generate Classification Report
+    print("Classification Report:")
+    print(classification_report(y_test_list, all_preds))
+
+    # Generate Confusion Matrix
+    cm = confusion_matrix(y_test_list, all_preds)
+    print("Confusion Matrix:")
+    print(cm)
+
     return accuracy
 
 
@@ -221,16 +204,21 @@ def evaluate_model(model, X_val, y_val, device):
             all_preds.append(predicted_label)
 
     accuracy = accuracy_score(y_val_list, all_preds)
+    # Generate Classification Report
+    print("Classification Report:")
+    print(classification_report(y_val_list, all_preds))
+
+    # Generate Confusion Matrix
+    cm = confusion_matrix(y_val_list, all_preds)
+    print("Confusion Matrix:")
+    print(cm)
+
     return accuracy
 
 
 # Main function to train and evaluate with given parameters
 def train_and_evaluate(params, X_train, y_train, X_val, y_val, vocab_size, output_size, device):
-    model, optimizer = initialize_model_and_optimizer(vocab_size, output_size, params, device)
-    criterion = nn.NLLLoss()
-    for epoch in range(num_epochs):
-        train_one_epoch(model, optimizer, criterion, X_train, y_train, params, device, epoch)
-
+    model = train(params, X_train, y_train, vocab_size, output_size, device)
     val_accuracy = evaluate_model(model, X_val, y_val, device)
     return val_accuracy
 
@@ -263,14 +251,13 @@ def perform_random_search(param_space, num_samples, X_train, y_train, X_val, y_v
 if __name__ == '__main__':
     output_size = 3
     label_column = 'label'
-    mode = 'hypertune'
-
-    train_df = pd.read_csv('./data/train.csv')
-    train_df = train_df.sample(2000, random_state=42)
+    mode = 'train'
+    train_df = pd.read_csv('./data/train_debiased_100.csv')
+    # train_df = train_df.sample(100, random_state=42)
     X_train = train_df.drop(columns=[label_column])
     y_train = train_df[label_column]
     if mode == 'hypertune':
-        val_df = pd.read_csv('./data/val.csv')
+        val_df = pd.read_csv('./data/val_debiased_100.csv')
         X_val = val_df.drop(columns=[label_column])
         y_val = val_df[label_column]
 
@@ -280,10 +267,11 @@ if __name__ == '__main__':
             'hidden_size': [64, 128, 256],
             'learning_rate': [0.01, 0.05, 0.1],
             'optimizer': ['SGD', 'Adam'],
-            'batch_size': [64, 128, 256]
+            'batch_size': [64, 128, 256],
+            'num_epochs': ['3']
         }
         num_samples = 10
-        num_epochs = 3
+        # num_epochs = 3
 
         # Load your data
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -297,21 +285,27 @@ if __name__ == '__main__':
         hidden_size = 128
         learning_rate = 0.05
         num_epochs = 10
+        params = {
+            'embedding_dim': 50,
+            'hidden_size': 128,
+            'learning_rate':  0.05,
+            'optimizer': 'SGD',
+            'batch_size': 64,
+            'num_epochs': 10
+        }
 
         test_df = pd.read_csv('./data/test.csv')
         X_test = test_df.drop(columns=[label_column])
         y_test = test_df[label_column]
 
-        X_train, X_test, vocab_size = build_vocabulary(X_train, X_test)
-        model = RNN(vocab_size, embedding_dim, hidden_size, output_size)
-        criterion = nn.NLLLoss()
-        optimizer = optim.SGD(model.parameters(), lr=learning_rate)
-
         # Move it to GPU
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f'Using device: {device}')
 
-        train(model, X_train, y_train)
+        X_train, X_test, vocab_size = build_vocabulary(X_train, X_test)
+
+
+        model = train(params, X_train, y_train, vocab_size, output_size, device, save=True)
 
         # Load the model weights
         # model.load_state_dict(torch.load('rnn_model_2.pth'))
